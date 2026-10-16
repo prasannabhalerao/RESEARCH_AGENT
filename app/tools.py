@@ -1,23 +1,42 @@
-def calculator(a: float, b: float, operation: str) -> float:
-    """Perform basic arithmetic on two numbers.
+from pathlib import Path
 
-    Args:
-        a: The first number.
-        b: The second number.
-        operation: One of add, subtract, multiply, or divide.
-    """
+
+DATA_DIR = Path("data")
+NOTES_FILE = DATA_DIR / "notes.txt"
+
+
+def calculator(a: float, b: float, operation: str) -> float:
+    """Perform basic arithmetic on two numbers."""
     if operation == "add":
         return a + b
 
-    elif operation == "subtract":
+    if operation == "subtract":
         return a - b
 
-    elif operation == "multiply":
+    if operation == "multiply":
         return a * b
 
-    elif operation == "divide":
+    if operation == "divide":
         if b == 0:
             raise ValueError("Cannot divide by zero.")
         return a / b
 
     raise ValueError("Unsupported operation.")
+
+
+def save_note(note: str) -> str:
+    """Save a text note to the local notes file."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    with NOTES_FILE.open("a", encoding="utf-8") as file:
+        file.write(note.replace("\n", " ") + "\n")
+
+    return "Note saved successfully."
+
+
+def read_notes() -> str:
+    """Read all previously saved notes."""
+    if not NOTES_FILE.exists():
+        return "No notes have been saved yet."
+
+    return NOTES_FILE.read_text(encoding="utf-8")

@@ -1,16 +1,21 @@
 from ollama import chat
-from app.tools import calculator
+
+from app.tools import calculator, save_note, read_notes
 
 
 MODEL = "qwen3:8b"
 
 SYSTEM_PROMPT = """
-You are a helpful AI assistant.
+You are a helpful local AI agent.
 
-You have access to a calculator tool.
-Use the calculator for arithmetic calculations.
-After receiving the calculator result, explain the answer clearly.
-Do not invent calculation results.
+You have three tools:
+1. calculator: perform arithmetic.
+2. save_note: save a note requested by the user.
+3. read_notes: read previously saved notes.
+
+Use the appropriate tool when needed.
+After receiving a tool result, explain the result to the user.
+Do not claim a note was saved unless the tool confirms success.
 """
 
 
@@ -22,31 +27,29 @@ def run_agent(user_goal: str) -> None:
 
     available_tools = {
         "calculator": calculator,
+        "save_note": save_note,
+        "read_notes": read_notes,
     }
 
     for step in range(5):
         response = chat(
             model=MODEL,
             messages=messages,
-            tools=[calculator],
+            tools=[calculator, save_note, read_notes],
         )
 
-        # Save the model's response, including any tool calls.
         messages.append(response.message)
 
-        # If the model did not request a tool, show its answer.
         if not response.message.tool_calls:
             print("\nFinal answer:")
             print(response.message.content)
             return
 
-        # Execute each tool requested by the model.
         for tool_call in response.message.tool_calls:
             tool_name = tool_call.function.name
             arguments = tool_call.function.arguments
 
-            print(f"Tool requested: {tool_name}")
-            print(f"Arguments: {arguments}")
+            print(f"\nTool requested: {tool_name}")
 
             function_to_call = available_tools.get(tool_name)
 
@@ -56,13 +59,11 @@ def run_agent(user_goal: str) -> None:
 
             try:
                 result = function_to_call(**arguments)
-
-            except (ValueError, TypeError, KeyError) as error:
+            except (ValueError, TypeError, KeyError, OSError) as error:
                 result = f"Tool error: {error}"
 
             print(f"Tool result: {result}")
 
-            # Return the tool result to the model.
             messages.append(
                 {
                     "role": "tool",
