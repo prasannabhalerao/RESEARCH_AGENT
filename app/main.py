@@ -1,5 +1,3 @@
-import json
-
 from ollama import chat
 from app.tools import calculator
 
@@ -7,100 +5,71 @@ from app.tools import calculator
 MODEL = "qwen3:8b"
 
 SYSTEM_PROMPT = """
-You are an AI agent that can use a calculator.
+You are a helpful AI assistant.
 
-You must respond with valid JSON only.
-
-If a calculation is needed, return:
-{
-    "action": "calculator",
-    "a": 125,
-    "b": 48,
-    "operation": "multiply"
-}
-
-Use only these operations:
-add, subtract, multiply, divide.
-
-If the calculation result has been provided and you can answer,
-return:
-{
-    "action": "final",
-    "answer": "Your final answer here"
-}
-
+You have access to a calculator tool.
+Use the calculator for arithmetic calculations.
+After receiving the calculator result, explain the answer clearly.
 Do not invent calculation results.
 """
 
 
-def run_agent(user_goal):
+def run_agent(user_goal: str) -> None:
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_goal},
     ]
 
-    # Limit the loop to avoid endless execution.
+    available_tools = {
+        "calculator": calculator,
+    }
+
     for step in range(5):
         response = chat(
             model=MODEL,
             messages=messages,
-            format="json",
-            options={"temperature": 0},
+            tools=[calculator],
         )
 
-        content = response.message.content
+        # Save the model's response, including any tool calls.
+        messages.append(response.message)
 
-        try:
-            decision = json.loads(content)
-        except json.JSONDecodeError:
-            print("The model returned invalid JSON.")
-            print(content)
+        # If the model did not request a tool, show its answer.
+        if not response.message.tool_calls:
+            print("\nFinal answer:")
+            print(response.message.content)
             return
 
-        action = decision.get("action")
+        # Execute each tool requested by the model.
+        for tool_call in response.message.tool_calls:
+            tool_name = tool_call.function.name
+            arguments = tool_call.function.arguments
 
-        if action == "calculator":
-            try:
-                a = float(decision["a"])
-                b = float(decision["b"])
-                operation = decision["operation"]
+            print(f"Tool requested: {tool_name}")
+            print(f"Arguments: {arguments}")
 
-                if operation not in {
-                    "add", "subtract", "multiply", "divide"
-                }:
-                    print("Unsupported operation requested.")
-                    return
+            function_to_call = available_tools.get(tool_name)
 
-                result = calculator(a, b, operation)
-
-            except (KeyError, TypeError, ValueError) as error:
-                print(f"Invalid calculator request: {error}")
+            if function_to_call is None:
+                print("Unknown tool requested.")
                 return
 
-            print(f"Agent used calculator. Result: {result}")
+            try:
+                result = function_to_call(**arguments)
 
-            # Send the tool result back to the LLM.
-            messages.append(
-                {"role": "assistant", "content": content}
-            )
+            except (ValueError, TypeError, KeyError) as error:
+                result = f"Tool error: {error}"
+
+            print(f"Tool result: {result}")
+
+            # Return the tool result to the model.
             messages.append(
                 {
-                    "role": "user",
-                    "content": (
-                        f"Calculator result: {result}. "
-                        "Now provide the final answer as JSON."
-                    ),
+                    "role": "tool",
+                    "name": tool_name,
+                    "content": str(result),
                 }
             )
-
-        elif action == "final":
-            print("\nFinal answer:")
-            print(decision.get("answer", "No answer provided."))
-            return
-
-        else:
-            print(f"Unknown action: {action}")
-            return
 
     print("Agent stopped: maximum number of steps reached.")
 

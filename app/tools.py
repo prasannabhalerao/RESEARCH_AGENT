@@ -1,6 +1,11 @@
-def calculator(a, b, operation):
-    """Perform a basic arithmetic calculation."""
+def calculator(a: float, b: float, operation: str) -> float:
+    """Perform basic arithmetic on two numbers.
 
+    Args:
+        a: The first number.
+        b: The second number.
+        operation: One of add, subtract, multiply, or divide.
+    """
     if operation == "add":
         return a + b
 
@@ -13,8 +18,6 @@ def calculator(a, b, operation):
     elif operation == "divide":
         if b == 0:
             raise ValueError("Cannot divide by zero.")
-
         return a / b
 
-    else:
-        raise ValueError("Unsupported operation.")
+    raise ValueError("Unsupported operation.")
