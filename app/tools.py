@@ -1,5 +1,6 @@
+import math
 from pathlib import Path
-
+from ollama import embed
 
 DATA_DIR = Path("data")
 NOTES_FILE = DATA_DIR / "notes.txt"
@@ -64,8 +65,8 @@ def search_notes(query: str) -> str:
 
     return "\n".join(matches)
 
-def search_documents(query: str) -> str:
-    """Search project documents and return relevant text with filenames."""
+"""def search_documents(query: str) -> str:
+    Search project documents and return relevant text with filenames.
 
     if not DOCUMENTS_DIR.exists():
         return "No documents directory found."
@@ -116,4 +117,87 @@ def search_documents(query: str) -> str:
             f"Content: {paragraph}"
         )
 
+    return "\n\n".join(output)"""
+    
+    
+    
+def get_embedding(text: str) -> list[float]:
+    """Convert text into a numerical vector using Ollama."""
+    response = embed(
+        model="nomic-embed-text",
+        input=text,
+    )
+    return response["embeddings"][0]
+
+
+def cosine_similarity(
+    vector_a: list[float],
+    vector_b: list[float],
+) -> float:
+    """Measure the similarity between two vectors."""
+    dot_product = sum(
+        a * b for a, b in zip(vector_a, vector_b)
+    )
+
+    magnitude_a = math.sqrt(sum(a * a for a in vector_a))
+    magnitude_b = math.sqrt(sum(b * b for b in vector_b))
+
+    if magnitude_a == 0 or magnitude_b == 0:
+        return 0.0
+
+    return dot_product / (magnitude_a * magnitude_b)
+
+
+def search_documents(query: str) -> str:
+    """Retrieve document paragraphs by semantic similarity."""
+
+    if not DOCUMENTS_DIR.exists():
+        return "No documents directory found."
+
+    paragraphs = []
+
+    for file_path in DOCUMENTS_DIR.rglob("*.txt"):
+        text = file_path.read_text(encoding="utf-8")
+
+        for paragraph in text.splitlines():
+            paragraph = paragraph.strip()
+
+            if paragraph:
+                paragraphs.append(
+                    (file_path.name, paragraph)
+                )
+
+    if not paragraphs:
+        return "No document content found."
+
+    query_embedding = get_embedding(query)
+    scored_results = []
+
+    for filename, paragraph in paragraphs:
+        paragraph_embedding = get_embedding(paragraph)
+
+        score = cosine_similarity(
+            query_embedding,
+            paragraph_embedding,
+        )
+
+        scored_results.append(
+            (score, filename, paragraph)
+        )
+
+    scored_results.sort(
+        key=lambda item: item[0],
+        reverse=True,
+    )
+
+    output = []
+
+    for score, filename, paragraph in scored_results[:3]:
+        output.append(
+            f"Source: {filename}\n"
+            f"Similarity: {score:.4f}\n"
+            f"Content: {paragraph}"
+        )
+
     return "\n\n".join(output)
+ 
