@@ -1,6 +1,11 @@
 from ollama import chat
 
-from app.tools import calculator, save_note, read_notes
+from app.tools import (
+    calculator,
+    save_note,
+    read_notes,
+    search_notes,
+)
 
 
 MODEL = "qwen3:8b"
@@ -8,16 +13,19 @@ MODEL = "qwen3:8b"
 SYSTEM_PROMPT = """
 You are a helpful local AI agent.
 
-You have three tools:
+Available tools:
 1. calculator: perform arithmetic.
 2. save_note: save a note requested by the user.
-3. read_notes: read previously saved notes.
+3. read_notes: read all saved notes.
+4. search_notes: find notes matching a search query.
 
-Use the appropriate tool when needed.
-After receiving a tool result, explain the result to the user.
-Do not claim a note was saved unless the tool confirms success.
+When the user asks about previously saved information,
+use search_notes when a targeted search is appropriate.
+Use read_notes when the user explicitly wants all notes.
+
+Base answers about saved notes on tool results.
+Do not invent notes that were not retrieved.
 """
-
 
 def run_agent(user_goal: str) -> None:
     messages = [
@@ -26,16 +34,17 @@ def run_agent(user_goal: str) -> None:
     ]
 
     available_tools = {
-        "calculator": calculator,
-        "save_note": save_note,
-        "read_notes": read_notes,
+    "calculator": calculator,
+    "save_note": save_note,
+    "read_notes": read_notes,
+    "search_notes": search_notes,
     }
 
     for step in range(5):
         response = chat(
             model=MODEL,
             messages=messages,
-            tools=[calculator, save_note, read_notes],
+            tools=[calculator, save_note, read_notes, search_notes],
         )
 
         messages.append(response.message)

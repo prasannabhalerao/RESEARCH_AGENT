@@ -40,3 +40,26 @@ def read_notes() -> str:
         return "No notes have been saved yet."
 
     return NOTES_FILE.read_text(encoding="utf-8")
+
+def search_notes(query: str) -> str:
+    """Search saved notes for matching keywords."""
+
+    if not NOTES_FILE.exists():
+        return "No notes have been saved yet."
+
+    notes = NOTES_FILE.read_text(encoding="utf-8").splitlines()
+
+    keywords = set(query.lower().split())
+
+    # Ignore very short words that usually add little meaning.
+    keywords = {word for word in keywords if len(word) > 2}
+
+    matches = [
+        note for note in notes
+        if any(word in note.lower() for word in keywords)
+    ]
+
+    if not matches:
+        return "No matching notes found."
+
+    return "\n".join(matches)
