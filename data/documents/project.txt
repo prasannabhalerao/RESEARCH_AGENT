@@ -1,0 +1,14 @@
+Project Name: Agentic AI Researcher
+
+Backend:
+The application is written in Python.
+
+Language Model:
+Ollama runs the Qwen3 8B language model locally.
+
+Tools:
+The calculator is a Python function.
+The note tool saves information to a local text file.
+
+Memory:
+The application can search saved notes using keyword matching.

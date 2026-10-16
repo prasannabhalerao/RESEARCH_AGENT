@@ -5,6 +5,7 @@ from app.tools import (
     save_note,
     read_notes,
     search_notes,
+    search_documents,
 )
 
 
@@ -18,6 +19,11 @@ Available tools:
 2. save_note: save a note requested by the user.
 3. read_notes: read all saved notes.
 4. search_notes: find notes matching a search query.
+5. search_documents: search project documents for relevant information.
+
+When the user asks a question about project documentation,
+use search_documents before answering.
+Base answers about project documents on the retrieved content.
 
 When the user asks about previously saved information,
 use search_notes when a targeted search is appropriate.
@@ -38,13 +44,15 @@ def run_agent(user_goal: str) -> None:
     "save_note": save_note,
     "read_notes": read_notes,
     "search_notes": search_notes,
+    "search_documents": search_documents,
     }
 
     for step in range(5):
         response = chat(
             model=MODEL,
             messages=messages,
-            tools=[calculator, save_note, read_notes, search_notes],
+            tools=[calculator, save_note, read_notes,search_notes,
+        search_documents,],
         )
 
         messages.append(response.message)

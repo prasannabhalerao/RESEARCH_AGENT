@@ -3,7 +3,7 @@ from pathlib import Path
 
 DATA_DIR = Path("data")
 NOTES_FILE = DATA_DIR / "notes.txt"
-
+DOCUMENTS_DIR = Path("data/documents")
 
 def calculator(a: float, b: float, operation: str) -> float:
     """Perform basic arithmetic on two numbers."""
@@ -63,3 +63,57 @@ def search_notes(query: str) -> str:
         return "No matching notes found."
 
     return "\n".join(matches)
+
+def search_documents(query: str) -> str:
+    """Search project documents and return relevant text with filenames."""
+
+    if not DOCUMENTS_DIR.exists():
+        return "No documents directory found."
+
+    keywords = {
+        word.lower().strip(".,?!:;()")
+        for word in query.split()
+        if len(word.strip(".,?!:;()")) > 2
+    }
+
+    if not keywords:
+        return "Please provide a more specific search query."
+
+    results = []
+
+    for file_path in DOCUMENTS_DIR.rglob("*.txt"):
+        text = file_path.read_text(encoding="utf-8")
+        paragraphs = [
+            paragraph.strip()
+            for paragraph in text.split("\n\n")
+            if paragraph.strip()
+        ]
+
+        for paragraph in paragraphs:
+            paragraph_words = {
+                word.lower().strip(".,?!:;()")
+                for word in paragraph.split()
+            }
+
+            score = len(keywords & paragraph_words)
+
+            if score > 0:
+                results.append(
+                    (score, file_path.name, paragraph)
+                )
+
+    if not results:
+        return "No relevant information found in the documents."
+
+    results.sort(key=lambda item: item[0], reverse=True)
+
+    output = []
+
+    for score, filename, paragraph in results[:5]:
+        output.append(
+            f"Source: {filename}\n"
+            f"Relevance score: {score}\n"
+            f"Content: {paragraph}"
+        )
+
+    return "\n\n".join(output)
