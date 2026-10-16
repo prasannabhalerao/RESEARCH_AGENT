@@ -148,8 +148,8 @@ def cosine_similarity(
     return dot_product / (magnitude_a * magnitude_b)
 
 
-def search_documents(query: str) -> str:
-    """Retrieve document paragraphs by semantic similarity."""
+"""def search_documents(query: str) -> str:
+    Retrieve document paragraphs by semantic similarity.
 
     if not DOCUMENTS_DIR.exists():
         return "No documents directory found."
@@ -199,5 +199,78 @@ def search_documents(query: str) -> str:
             f"Content: {paragraph}"
         )
 
-    return "\n\n".join(output)
+    return "\n\n".join(output)"""
  
+ 
+def search_documents(query: str) -> str:
+    """Retrieve document paragraphs using cached semantic embeddings."""
+
+    if not DOCUMENTS_DIR.exists():
+        return "No documents directory found."
+
+    # Cache document paragraphs and their embeddings in memory.
+    if not hasattr(search_documents, "_cache"):
+        search_documents._cache = {}
+
+    cache = search_documents._cache
+
+    # Discover the current document files.
+    paragraphs = []
+
+    for file_path in DOCUMENTS_DIR.rglob("*.txt"):
+        text = file_path.read_text(encoding="utf-8")
+
+        for paragraph in text.splitlines():
+            paragraph = paragraph.strip()
+
+            if paragraph:
+                paragraphs.append(
+                    (str(file_path), paragraph)
+                )
+
+    if not paragraphs:
+        cache.clear()
+        return "No document content found."
+
+    # Rebuild the cache only when the document content changes.
+    current_content = tuple(paragraphs)
+
+    if cache.get("content") != current_content:
+        cache.clear()
+        cache["content"] = current_content
+        cache["embeddings"] = [
+            get_embedding(paragraph)
+            for _, paragraph in paragraphs
+        ]
+
+    # Only the user's query needs a new embedding.
+    query_embedding = get_embedding(query)
+    scored_results = []
+
+    for index, (filename, paragraph) in enumerate(paragraphs):
+        paragraph_embedding = cache["embeddings"][index]
+
+        score = cosine_similarity(
+            query_embedding,
+            paragraph_embedding,
+        )
+
+        scored_results.append(
+            (score, filename, paragraph)
+        )
+
+    scored_results.sort(
+        key=lambda item: item[0],
+        reverse=True,
+    )
+
+    output = []
+
+    for score, filename, paragraph in scored_results[:3]:
+        output.append(
+            f"Source: {Path(filename).name}\n"
+            f"Similarity: {score:.4f}\n"
+            f"Content: {paragraph}"
+        )
+
+    return "\n\n".join(output)
