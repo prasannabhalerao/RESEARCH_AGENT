@@ -67,6 +67,9 @@ Complete the current task. Use tools when needed.
         {"role": "user", "content": user_message},
     ]
 
+    # Store the original results returned by tools.
+    tool_evidence = []
+
     for _ in range(5):
         response = chat(
             model=MODEL,
@@ -83,7 +86,19 @@ Complete the current task. Use tools when needed.
         messages.append(response.message)
 
         if not response.message.tool_calls:
-            return response.message.content or "No answer was returned."
+            final_answer = (
+                response.message.content or "No answer was returned."
+            )
+
+            if tool_evidence:
+                evidence_text = "\n\n".join(tool_evidence)
+
+                return (
+                    f"{final_answer}\n\n"
+                    f"RAW TOOL EVIDENCE:\n{evidence_text}"
+                )
+
+            return final_answer
 
         for tool_call in response.message.tool_calls:
             tool_name = tool_call.function.name
@@ -103,6 +118,15 @@ Complete the current task. Use tools when needed.
 
             print(f"    Tool result: {result}")
 
+            # Preserve the original tool output for the final report.
+            tool_evidence.append(
+                f"Tool: {tool_name}\n"
+                f"Result:\n{result}"
+            )
+            # Stop execution if the tool returned an error.
+            if isinstance(result, str) and result.startswith("Tool error:"):
+               raise RuntimeError(result)
+           
             messages.append(
                 {
                     "role": "tool",
@@ -136,12 +160,15 @@ def run_plan(goal: str) -> None:
                 task=task["task"],
                 previous_results=state.tool_results,
             )
-
+            if result.startswith("Task stopped because"):
+             raise RuntimeError(result)
+         
             task["result"] = result
             task["status"] = "completed"
+
             state.tool_results.append(
                 f"Task {task['id']}: {task['task']}\n"
-                f"Result: {result}"
+                f"Result:\n{result}"
             )
 
             print(f"Task status: {task['status']}")
@@ -151,7 +178,7 @@ def run_plan(goal: str) -> None:
             task["status"] = "failed"
             task["result"] = str(error)
 
-            print(f"Task status: failed")
+            print("Task status: failed")
             print(f"Task error: {error}")
 
             # Stop rather than pretending later tasks succeeded.
@@ -174,9 +201,14 @@ def run_plan(goal: str) -> None:
                     "role": "system",
                     "content": (
                         "Prepare a concise final report for the user's "
-                        "original goal using the task results provided. "
-                        "Do not invent facts or claim failed tasks succeeded. "
-                        "Identify missing information when relevant."
+                        "original goal. Use RAW TOOL EVIDENCE as the "
+                        "primary source for factual claims. Earlier task "
+                        "summaries may contain unsupported claims, so "
+                        "do not treat summaries alone as evidence. "
+                        "Only state project-specific facts supported "
+                        "by tool results. Do not invent technologies "
+                        "or capabilities. Explicitly identify missing "
+                        "information and incomplete tasks."
                     ),
                 },
                 {
@@ -197,7 +229,10 @@ def run_plan(goal: str) -> None:
             ],
         )
 
-        print(report_response.message.content or "No final report returned.")
+        print(
+            report_response.message.content
+            or "No final report returned."
+        )
 
     if state.completed:
         print("\nPlan completed successfully.")
