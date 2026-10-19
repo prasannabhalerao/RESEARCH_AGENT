@@ -228,8 +228,8 @@ def chunk_text(text: str, max_words: int = 100, overlap: int = 20) -> list[str]:
 
     return chunks
 
-def search_documents(query: str) -> str:
-    """Retrieve document paragraphs using cached semantic embeddings."""
+"""def search_documents(query: str) -> str:
+  Retrieve document paragraphs using cached semantic embeddings.
 
     if not DOCUMENTS_DIR.exists():
         return "No documents directory found."
@@ -309,6 +309,86 @@ def search_documents(query: str) -> str:
             f"Source: {Path(filename).name}\n"
             f"Similarity: {score:.4f}\n"
             f"Content: {paragraph}"
+        )
+
+    return "\n\n".join(output)"""
+    
+def search_documents(query: str) -> str:
+    """Retrieve relevant document chunks using cached embeddings."""
+
+    if not DOCUMENTS_DIR.exists():
+        return "No documents directory found."
+
+    if not hasattr(search_documents, "_cache"):
+        search_documents._cache = {}
+
+    cache = search_documents._cache
+    chunks = []
+
+    # Read files and split their contents into overlapping chunks.
+    for file_path in DOCUMENTS_DIR.rglob("*.txt"):
+        text = file_path.read_text(encoding="utf-8")
+        document_chunks = chunk_text(
+            text,
+            max_words=25,
+            overlap=5,
+        )
+
+        for chunk in document_chunks:
+            chunks.append((str(file_path), chunk))
+
+    if not chunks:
+        cache.clear()
+        return "No document content found."
+
+    # Rebuild cached embeddings if document chunks have changed.
+    current_content = tuple(chunks)
+
+    if cache.get("content") != current_content:
+        cache.clear()
+        cache["content"] = current_content
+        cache["embeddings"] = [
+            get_embedding(chunk)
+            for _, chunk in chunks
+        ]
+
+    # Embed the query and rank document chunks.
+    query_embedding = get_embedding(query)
+    scored_results = []
+
+    for index, (filename, chunk) in enumerate(chunks):
+        score = cosine_similarity(
+            query_embedding,
+            cache["embeddings"][index],
+        )
+
+        scored_results.append((score, filename, chunk))
+
+    scored_results.sort(
+        key=lambda item: item[0],
+        reverse=True,
+    )
+
+    SIMILARITY_THRESHOLD = 0.35
+
+    relevant_results = [
+        item for item in scored_results
+        if item[0] >= SIMILARITY_THRESHOLD
+    ]
+
+    if not relevant_results:
+        return (
+            "No sufficiently relevant information was found "
+            "in the project documents."
+        )
+
+    output = []
+
+    for score, filename, chunk in relevant_results[:3]:
+        output.append(
+            f"Source: {Path(filename).name}\n"
+            f"Similarity: {score:.4f}\n"
+            f"Content: {chunk}"
         )
 
     return "\n\n".join(output)
