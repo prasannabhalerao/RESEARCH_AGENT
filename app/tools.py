@@ -1,5 +1,7 @@
 import math
+import re
 from pathlib import Path
+
 from ollama import embed
 
 DATA_DIR = Path("data")
@@ -203,28 +205,65 @@ def cosine_similarity(
  
  
 
-def chunk_text(text: str, max_words: int = 100, overlap: int = 20) -> list[str]:
-    """Split text into word-based chunks with a small overlap."""
+
+def chunk_text(
+    text: str,
+    max_words: int = 25,
+    overlap_sentences: int = 1,
+) -> list[str]:
+    """Group complete sentences into overlapping document chunks."""
 
     if max_words <= 0:
         raise ValueError("max_words must be positive.")
 
-    if overlap < 0 or overlap >= max_words:
-        raise ValueError("overlap must be between 0 and max_words.")
+    if overlap_sentences < 0:
+        raise ValueError("overlap_sentences cannot be negative.")
 
-    words = text.split()
+    # Normalize whitespace and split at sentence boundaries.
+    normalized_text = " ".join(text.split())
+
+    sentences = re.split(
+        r"(?<=[.!?])\s+",
+        normalized_text,
+    )
+
+    sentences = [
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip()
+    ]
+
     chunks = []
-    start = 0
+    current_sentences = []
+    current_word_count = 0
 
-    while start < len(words):
-        end = start + max_words
-        chunk = " ".join(words[start:end])
-        chunks.append(chunk)
+    for sentence in sentences:
+        sentence_word_count = len(sentence.split())
 
-        if end >= len(words):
-            break
+        if (
+            current_sentences
+            and current_word_count + sentence_word_count > max_words
+        ):
+            chunks.append(" ".join(current_sentences))
 
-        start = end - overlap
+            # Carry the last sentence into the next chunk.
+            if overlap_sentences:
+                current_sentences = current_sentences[
+                    -overlap_sentences:
+                ]
+            else:
+                current_sentences = []
+
+            current_word_count = sum(
+                len(item.split())
+                for item in current_sentences
+            )
+
+        current_sentences.append(sentence)
+        current_word_count += sentence_word_count
+
+    if current_sentences:
+        chunks.append(" ".join(current_sentences))
 
     return chunks
 
@@ -331,7 +370,7 @@ def search_documents(query: str) -> str:
         document_chunks = chunk_text(
             text,
             max_words=25,
-            overlap=5,
+            overlap_sentences=1,
         )
 
         for chunk in document_chunks:

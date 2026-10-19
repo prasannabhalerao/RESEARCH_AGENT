@@ -10,7 +10,11 @@ text = (
     "Semantic search retrieves relevant document passages."
 )
 
-chunks = chunk_text(text, max_words=10, overlap=3)
+chunks = chunk_text(
+    text,
+    max_words=10,
+    overlap_sentences=1,
+)
 
 for index, chunk in enumerate(chunks, start=1):
     print(f"\nChunk {index}:")
