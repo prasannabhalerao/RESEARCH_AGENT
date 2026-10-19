@@ -203,6 +203,31 @@ def cosine_similarity(
  
  
 
+def chunk_text(text: str, max_words: int = 100, overlap: int = 20) -> list[str]:
+    """Split text into word-based chunks with a small overlap."""
+
+    if max_words <= 0:
+        raise ValueError("max_words must be positive.")
+
+    if overlap < 0 or overlap >= max_words:
+        raise ValueError("overlap must be between 0 and max_words.")
+
+    words = text.split()
+    chunks = []
+    start = 0
+
+    while start < len(words):
+        end = start + max_words
+        chunk = " ".join(words[start:end])
+        chunks.append(chunk)
+
+        if end >= len(words):
+            break
+
+        start = end - overlap
+
+    return chunks
+
 def search_documents(query: str) -> str:
     """Retrieve document paragraphs using cached semantic embeddings."""
 
@@ -263,7 +288,7 @@ def search_documents(query: str) -> str:
     )
 
     # Filter out low-similarity results.
-    SIMILARITY_THRESHOLD = 0.35
+    SIMILARITY_THRESHOLD =  0.50
 
     relevant_results = [
         item for item in scored_results
